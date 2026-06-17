@@ -15,34 +15,138 @@ const fmtT = s => { s = Math.max(0, Math.floor(s)); return String(Math.floor(s /
 function hash2(cx, cy) { let h = cx * 374761393 + cy * 668265263; h = (h ^ (h >> 13)) * 1274126177; h = h ^ (h >> 16); return Math.abs(h); }
 function pickWeighted(w) { let tot = 0; for (const k in w) tot += w[k]; let r = Math.random() * tot; for (const k in w) { r -= w[k]; if (r <= 0) return k; } return Object.keys(w)[0]; }
 
-/* ---------------- 闊虫晥锛圵ebAudio 鍚堟垚锛岀劇绱犳潗锛?---------------- */
-let AC = null, soundOn = localStorage.getItem('ddtg_sound') !== '0';
-const sfxLast = {};
+/* ---------------- Audio: procedural WebAudio SFX ---------------- */
+let AC = null, audioMaster = null, soundOn = localStorage.getItem('ddtg_sound') !== '0';
+let audioUnlocked = false;
+const sfxLast = Object.create(null);
+const audioEvents = [];
+const sfxCooldown = {
+  shoot: 42, hit: 38, pick: 44, zap: 62,
+  boom: 100, hurt: 140, chest: 180, boss: 420,
+  lvl: 260, win: 420, lose: 420,
+};
+function unlockAudio() {
+  audioUnlocked = true;
+  if (AC && AC.state === 'suspended') AC.resume().catch(() => {});
+}
+addEventListener('pointerdown', unlockAudio, { capture: true, passive: true });
+addEventListener('touchstart', unlockAudio, { capture: true, passive: true });
+addEventListener('keydown', unlockAudio, { capture: true, passive: true });
+function audioCtx() {
+  AC = AC || new (window.AudioContext || window.webkitAudioContext)();
+  if (!audioMaster) {
+    audioMaster = AC.createGain();
+    audioMaster.gain.value = .72;
+    audioMaster.connect(AC.destination);
+  }
+  if (AC.state === 'suspended') AC.resume();
+  return AC;
+}
+function logSfx(name) {
+  audioEvents.push({ name, t: Math.round((AC ? AC.currentTime : 0) * 1000) / 1000 });
+  if (audioEvents.length > 40) audioEvents.shift();
+}
+function playTone(freq, dur, type, vol, delay = 0, endFreq = 0) {
+  const ac = audioCtx();
+  const t = ac.currentTime + delay;
+  const o = ac.createOscillator();
+  const g = ac.createGain();
+  o.type = type || 'sine';
+  o.frequency.setValueAtTime(Math.max(20, freq), t);
+  if (endFreq) o.frequency.exponentialRampToValueAtTime(Math.max(20, endFreq), t + Math.max(.01, dur));
+  g.gain.setValueAtTime(.0001, t);
+  g.gain.exponentialRampToValueAtTime(Math.max(.0002, vol), t + .006);
+  g.gain.exponentialRampToValueAtTime(.0001, t + Math.max(.012, dur));
+  o.connect(g); g.connect(audioMaster || ac.destination);
+  o.start(t); o.stop(t + dur + .04);
+}
+function playNoise(dur, vol, delay = 0, filterType = 'bandpass', freq = 900, q = .8) {
+  const ac = audioCtx();
+  const t = ac.currentTime + delay;
+  const len = Math.max(1, Math.floor(ac.sampleRate * dur));
+  const buffer = ac.createBuffer(1, len, ac.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < len; i++) {
+    const fade = 1 - i / len;
+    data[i] = (Math.random() * 2 - 1) * fade;
+  }
+  const src = ac.createBufferSource();
+  const filter = ac.createBiquadFilter();
+  const g = ac.createGain();
+  src.buffer = buffer;
+  filter.type = filterType;
+  filter.frequency.setValueAtTime(freq, t);
+  filter.Q.setValueAtTime(q, t);
+  g.gain.setValueAtTime(.0001, t);
+  g.gain.exponentialRampToValueAtTime(Math.max(.0002, vol), t + .006);
+  g.gain.exponentialRampToValueAtTime(.0001, t + Math.max(.012, dur));
+  src.connect(filter); filter.connect(g); g.connect(audioMaster || ac.destination);
+  src.start(t); src.stop(t + dur + .035);
+}
 function sfx(name) {
   if (!soundOn) return;
+  if (!audioUnlocked && !(navigator.userActivation && navigator.userActivation.isActive)) return;
   const now = performance.now();
-  if (sfxLast[name] && now - sfxLast[name] < 70) return;
+  const cd = sfxCooldown[name] == null ? 70 : sfxCooldown[name];
+  if (sfxLast[name] && now - sfxLast[name] < cd) return;
   sfxLast[name] = now;
   try {
-    AC = AC || new (window.AudioContext || window.webkitAudioContext)();
-    if (AC.state === 'suspended') AC.resume();
-    const t = AC.currentTime;
-    const P = {
-      shoot: [760, .045, 'square', .025], hit: [170, .05, 'sawtooth', .04],
-      pick: [900, .06, 'sine', .05], lvl: [523, .32, 'triangle', .12],
-      boom: [85, .3, 'sawtooth', .16], hurt: [130, .16, 'square', .12],
-      chest: [660, .28, 'triangle', .1], boss: [58, .9, 'sawtooth', .2],
-      win: [784, .55, 'triangle', .14], lose: [220, .7, 'sawtooth', .12],
-      zap: [1200, .08, 'square', .05]
-    }[name] || [440, .1, 'sine', .05];
-    const o = AC.createOscillator(), g = AC.createGain();
-    o.connect(g); g.connect(AC.destination);
-    o.type = P[2]; o.frequency.setValueAtTime(P[0], t);
-    if (name === 'lvl' || name === 'win' || name === 'chest' || name === 'pick') o.frequency.exponentialRampToValueAtTime(P[0] * 2, t + P[1]);
-    if (name === 'boss' || name === 'lose' || name === 'boom') o.frequency.exponentialRampToValueAtTime(Math.max(30, P[0] * .4), t + P[1]);
-    g.gain.setValueAtTime(P[3], t); g.gain.exponentialRampToValueAtTime(.0001, t + P[1]);
-    o.start(t); o.stop(t + P[1] + .02);
-  } catch (e) { /* 鐒￠煶鏁堢挵澧冨拷鐣?*/ }
+    audioCtx();
+    logSfx(name);
+    switch (name) {
+      case 'shoot':
+        playTone(520, .038, 'square', .018, 0, 820);
+        playNoise(.028, .008, 0, 'highpass', 2200, .35);
+        break;
+      case 'hit':
+        playNoise(.045, .025, 0, 'bandpass', 680, .9);
+        playTone(210, .036, 'triangle', .014, 0, 120);
+        break;
+      case 'pick':
+        playTone(820, .05, 'sine', .038, 0, 1280);
+        playTone(1280, .055, 'triangle', .024, .045);
+        break;
+      case 'chest':
+        playTone(520, .07, 'triangle', .05, 0, 780);
+        playTone(780, .08, 'triangle', .045, .075, 1180);
+        playTone(1180, .11, 'sine', .036, .15);
+        break;
+      case 'lvl':
+        [523, 659, 784, 1047].forEach((f, i) => playTone(f, .11, 'triangle', .055 - i * .004, i * .055));
+        playNoise(.16, .018, .08, 'highpass', 2600, .5);
+        break;
+      case 'boss':
+        playTone(92, .48, 'sawtooth', .085, 0, 54);
+        playTone(184, .42, 'square', .032, .08, 120);
+        playNoise(.22, .03, 0, 'lowpass', 420, .8);
+        break;
+      case 'boom':
+        playNoise(.26, .09, 0, 'lowpass', 520, .75);
+        playTone(92, .28, 'sawtooth', .075, 0, 34);
+        playTone(52, .18, 'triangle', .045, .035, 28);
+        break;
+      case 'hurt':
+        playTone(190, .16, 'sawtooth', .07, 0, 72);
+        playNoise(.09, .025, 0, 'bandpass', 360, .75);
+        break;
+      case 'zap':
+        playTone(1480, .055, 'square', .035, 0, 620);
+        playTone(2250, .036, 'sawtooth', .018, .018, 900);
+        playNoise(.055, .022, 0, 'highpass', 3200, .45);
+        break;
+      case 'win':
+        [523, 659, 784, 1047, 1319].forEach((f, i) => playTone(f, .16, 'triangle', .052, i * .07));
+        playTone(1568, .32, 'sine', .046, .36);
+        break;
+      case 'lose':
+        playTone(330, .26, 'sawtooth', .052, 0, 196);
+        playTone(220, .42, 'triangle', .052, .18, 82);
+        break;
+      default:
+        playTone(440, .08, 'sine', .04);
+        break;
+    }
+  } catch (e) { /* Audio can fail in restricted browser contexts. */ }
 }
 
 /* ---------------- Skills ---------------- */
@@ -2731,6 +2835,11 @@ window.DBG = {
     splashProc: { ok: spriteReady(SPRITES.splashProc), w: SPRITES.splashProc.naturalWidth || 0, h: SPRITES.splashProc.naturalHeight || 0 },
     walker: { ok: spriteReady(SPRITES.enemies.walker), w: SPRITES.enemies.walker.naturalWidth || 0, h: SPRITES.enemies.walker.naturalHeight || 0 },
   }),
+  audio: () => ({ on: soundOn, unlocked: audioUnlocked, hasContext: !!AC, state: AC ? AC.state : 'none', events: audioEvents.slice() }),
+  audioTest: () => {
+    ['pick', 'shoot', 'hit', 'zap', 'boom', 'hurt', 'chest', 'lvl', 'boss', 'win', 'lose'].forEach((name, i) => setTimeout(() => sfx(name), i * 115));
+    return true;
+  },
   renderText: () => renderGameToText(),
   pickFirst: () => { const c = document.querySelector('#lu-cards .lu-card'); if (c) c.click(); },
   reset: () => { localStorage.removeItem('ddtg_unlock'); localStorage.removeItem('ddtg_coins'); localStorage.removeItem('ddtg_talents'); location.reload(); },
