@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>噠噠特攻 機制復刻 Demo</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="style.css?v=bossbar-9slice-1">
+</head>
+<body>
+<div id="game-root">
+  <canvas id="cv"></canvas>
+
+  <!-- 遊戲中 HUD -->
+  <div id="hud" class="screen">
+    <div id="topbar">
+      <div id="expwrap"><div id="exptrack"><div id="expfill"></div></div><div id="lvbadge">Lv.1</div></div>
+      <div id="statsrow">
+        <span id="kills">💀 0</span>
+        <span id="timer">00:00</span>
+        <span id="coins"><span class="sprite-icon item-icon-img item-coin coin-icon hud-coin"></span><span class="coin-num">0</span></span>
+      </div>
+      <div id="skillbar"></div>
+    </div>
+    <div id="bosswrap">
+      <div id="bossname">BOSS</div>
+      <div id="bossbarbg"><div id="bossbar"></div></div>
+    </div>
+    <button id="btn-pause">⏸</button>
+    <div id="warn"></div>
+  </div>
+
+  <!-- 主選單 -->
+  <div id="menu" class="screen show">
+    <div class="logo">噠噠特攻</div>
+    <div class="logo-sub">機 制 復 刻 D E M O</div>
+    <div class="coins-total" id="menu-coins"><span class="sprite-icon item-icon-img item-coin coin-icon menu-coin"></span><span class="coin-num">0</span></div>
+    <button class="btn" id="btn-start">開始遊戲</button>
+    <button class="btn sub" id="btn-talents">天賦</button>
+    <button class="btn sub small" id="btn-sound">🔊 音效：開</button>
+    <div class="hint">🕹️ 滑鼠按住拖曳 / 觸控搖桿 / WASD 方向鍵 移動<br>角色自動攻擊，撿綠寶石升級，三選一強化技能，活到最後擊敗 BOSS！</div>
+    <div class="disclaim">本 Demo 為玩法機制研究用的非官方練習作品，美術皆為程式即時繪製之原創內容，與 Habby / Survivor.io 無關。</div>
+  </div>
+
+  <!-- 章節選擇 -->
+  <div id="talents" class="screen">
+    <h2>天賦強化</h2>
+    <div class="talent-wallet" id="talent-coins"><span class="sprite-icon item-icon-img item-coin coin-icon menu-coin"></span><span class="coin-num">0</span></div>
+    <div id="talent-list"></div>
+    <button class="btn sub small" id="btn-back-talents">← 返回</button>
+  </div>
+
+  <div id="select" class="screen">
+    <h2>選擇章節</h2>
+    <div id="ch-list"></div>
+    <button class="btn sub small" id="btn-back-menu">← 返回</button>
+  </div>
+
+  <!-- 升級三選一 -->
+  <div id="levelup" class="screen modal">
+    <h2>升 級 ！</h2>
+    <div id="lu-cards"></div>
+  </div>
+
+  <!-- 暫停 -->
+  <div id="pausemenu" class="screen modal">
+    <div class="panel">
+      <h2>暫停中</h2>
+      <div class="col">
+        <button class="btn" id="btn-resume">繼續</button>
+        <button class="btn sub" id="btn-retry-p">重新開始</button>
+        <button class="btn sub" id="btn-quit-p">回主選單</button>
+        <button class="btn sub small" id="btn-sound2">🔊 音效：開</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 結算 -->
+  <div id="result" class="screen modal">
+    <div class="panel">
+      <h2 id="result-title">章節通關</h2>
+      <div id="result-stats"></div>
+      <div class="col">
+        <button class="btn" id="btn-revive" style="display:none">💖 復活（剩 1 次）</button>
+        <button class="btn" id="btn-next" style="display:none">下一章 →</button>
+        <button class="btn sub" id="btn-retry">再玩一次</button>
+        <button class="btn sub" id="btn-select">章節選擇</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toasts"></div>
+</div>
+  <script src="game.js?v=bossbar-9slice-1"></script>
+</body>
+</html>
